@@ -35,24 +35,27 @@
 
 ## 🏗️ 아키텍처
 
-무거운 모델 3개(STT·LLM·TTS)는 GPU 백엔드에서, 화면과 마이크 처리는 무료 프론트엔드에서 돌도록 나눴습니다.
+무거운 모델 3개(STT·LLM·TTS)는 GPU 백엔드에서, 화면과 마이크 처리는 무료 프론트엔드에서 돌도록 나눴습니다. 프론트엔드는 백엔드 모델을 `gradio_client`로 원격 호출합니다.
 
 ```mermaid
 flowchart TB
-    U["🎙️ 브라우저 마이크"] -->|WebRTC 스트리밍| VAD
+    MIC["🎙️ 사용자 발화 (브라우저 마이크, WebRTC)"] --> VAD
     subgraph F["프론트엔드 · Streamlit Community Cloud (CPU)"]
-        direction LR
-        VAD["silero-vad<br>발화 구간 분리"] --> ORC["오케스트레이션<br>의도분류 · 단계 진행 · 재료대체"]
-        ORC <--> DB[("Supabase<br>레시피 DB")]
+        VAD["silero-vad · 발화 구간 분리"]
+        ORC["오케스트레이션 · 의도분류 · 단계 진행 · 재료대체"]
+        DB[("Supabase 레시피 DB")]
     end
-    ORC <-->|gradio_client 원격 호출| STT
     subgraph B["백엔드 · HF Spaces GPU (T4)"]
-        direction LR
-        STT["STT<br>Whisper large-v3-turbo"]
-        LLM["LLM<br>EXAONE 3.5 2.4B"]
-        TTS["TTS<br>Qwen3-TTS 1.7B"]
+        STT["STT · Whisper large-v3-turbo"]
+        LLM["LLM · EXAONE 3.5 2.4B"]
+        TTS["TTS · Qwen3-TTS 1.7B"]
     end
-    TTS -->|음성 응답| U
+    VAD -->|음성| STT
+    STT -->|텍스트| ORC
+    ORC <-->|요리명 추출| LLM
+    ORC <-->|레시피 조회| DB
+    ORC -->|안내 문장| TTS
+    TTS --> OUT["🔊 음성 안내"]
 ```
 
 | 구성 요소 | 모델 · 방식 |
